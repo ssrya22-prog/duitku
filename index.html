@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#090b0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Duitku">
+<title>Duitku</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="app">
+
+<header class="header">
+ <div class="brand">
+  <div class="logo" id="logoBox">₿</div>
+  <div>
+   <h1 id="appName">Duitku</h1>
+   <p id="monthText">...</p>
+  </div>
+ </div>
+ <button class="icon-btn" onclick="showPage('settings')">⚙</button>
+</header>
+
+<!-- BERANDA -->
+<section id="homePage" class="page active">
+
+ <div id="confirmBannerWrap"></div>
+
+ <div class="balance-grid">
+  <div class="balance-mini">
+   <div class="balance-mini-label">💵 Cash</div>
+   <div class="balance-mini-value cash-text" id="balanceCash">Rp 0</div>
+  </div>
+  <div class="balance-mini">
+   <div class="balance-mini-label">🏦 Non-tunai</div>
+   <div class="balance-mini-value nontunai-text" id="balanceNontunai">Rp 0</div>
+  </div>
+ </div>
+
+ <div class="balance-total">
+  <div class="card-label">Total Saldo</div>
+  <div class="balance" id="balanceTotal">Rp 0</div>
+  <div class="balance-info" id="balanceInfo">Belum ada transaksi</div>
+ </div>
+
+ <div class="actions">
+  <button class="action income" onclick="openTransaction('income')">＋ Pemasukan</button>
+  <button class="action expense" onclick="openTransaction('expense')">− Pengeluaran</button>
+ </div>
+
+ <div class="shortcuts">
+  <button class="shortcut" onclick="gotoPage('transactions')">
+   <span class="shortcut-icon">☷</span>Transaksi
+  </button>
+  <button class="shortcut" onclick="gotoPage('stats')">
+   <span class="shortcut-icon">◫</span>Statistik
+  </button>
+  <button class="shortcut" onclick="gotoPage('debts')">
+   <span class="shortcut-icon">⇄</span>Utang
+  </button>
+  <button class="shortcut" onclick="gotoPage('recurring')">
+   <span class="shortcut-icon">↻
+    <span class="shortcut-badge" id="recurringBadge" style="display:none">0</span>
+   </span>Berulang
+  </button>
+ </div>
+
+ <div class="summary">
+  <div class="summary-card">
+   <div class="summary-title">PEMASUKAN</div>
+   <div class="summary-value income-text" id="incomeTotal">Rp 0</div>
+  </div>
+  <div class="summary-card">
+   <div class="summary-title">PENGELUARAN</div>
+   <div class="summary-value expense-text" id="expenseTotal">Rp 0</div>
+  </div>
+  <div class="summary-month" id="summaryMonth">Bulan ini</div>
+ </div>
+
+ <div class="card">
+  <h3>Pengeluaran per Kategori</h3>
+  <div class="chart-tabs">
+   <button class="chart-tab active" onclick="showChart('donut',this)">Donat</button>
+   <button class="chart-tab" onclick="showChart('bar',this)">Batang</button>
+   <button class="chart-tab" onclick="showChart('line',this)">Garis</button>
+  </div>
+
+  <!-- Filter waktu untuk grafik -->
+  <div class="chart-range" id="chartRange">
+   <button class="range-btn active" data-range="month" onclick="setChartRange('month',this)">Bulan Ini</button>
+   <button class="range-btn" data-range="3month" onclick="setChartRange('3month',this)">3 Bulan</button>
+   <button class="range-btn" data-range="6month" onclick="setChartRange('6month',this)">6 Bulan</button>
+   <button class="range-btn" data-range="year" onclick="setChartRange('year',this)">1 Tahun</button>
+  </div>
+
+  <div class="chart-panel active" id="panel-donut">
+   <canvas id="chartDonut" class="chart-canvas"></canvas>
+   <div class="chart-legend" id="legendDonut"></div>
+   <div class="hint-text" style="margin-top:10px;text-align:center">Tap potongan untuk lihat detail</div>
+  </div>
+
+  <div class="chart-panel" id="panel-bar">
+   <div id="barList"></div>
+   <div class="hint-text" style="margin-top:10px;text-align:center">Tap bar untuk lihat transaksi · Tekan lama untuk sembunyikan</div>
+  </div>
+
+  <div class="chart-panel" id="panel-line">
+ <div class="chart-zoom-controls">
+  <button class="zoom-btn" onclick="lineZoom(1)" title="Zoom out">➖</button>
+  <button class="zoom-btn pan-btn" id="linePanLeftBtn" onclick="linePan(-1)" title="Geser ke kiri">◀</button>
+  <span class="zoom-label" id="lineZoomLabel">Semua</span>
+  <button class="zoom-btn pan-btn" id="linePanRightBtn" onclick="linePan(1)" title="Geser ke kanan">▶</button>
+  <button class="zoom-btn" onclick="lineZoom(-1)" title="Zoom in">➕</button>
+ </div>
+ <canvas id="chartLine" class="chart-canvas"></canvas>
+ <div class="hint-text" style="margin-top:10px;text-align:center" id="lineCaption"></div>
+ <div class="hint-text" style="text-align:center">Tap & geser 1 jari untuk tooltip · 2 jari untuk geser</div>
+</div>
+  </div>
+
+ <div class="card">
+  <h3>Analisis Keuangan</h3>
+  <div id="analysisCard"></div>
+ </div>
+
+ <div class="card">
+  <h3>Transaksi Terbaru</h3>
+  <div id="recentTransactions"></div>
+ </div>
+
+ <div class="app-footer">© 2026 Surya Ramadhan</div>
+ <div class="backup-reminder" id="backupReminder" onclick="showPage('settings')"></div>
+
+</section>
+
+<!-- TRANSAKSI -->
+<section id="transactionsPage" class="page">
+ <div class="card">
+  <h3>Semua Transaksi</h3>
+  <div class="month-picker">
+   <select id="monthFilter" onchange="onMonthChange(this.value)"></select>
+  </div>
+  <div id="transactionCount" style="color:#858b96;font-size:11px;margin-bottom:4px">0 transaksi</div>
+  <div class="hint-text" style="margin-bottom:13px">Tap transaksi untuk edit atau hapus.</div>
+  <div class="search-wrap">
+   <input id="searchInput" class="search-input" type="text" placeholder="Cari kategori, keterangan, nominal..." oninput="onSearchInput()">
+  </div>
+  <div class="filters">
+   <button class="filter active" onclick="setFilter('all',this)">Semua</button>
+   <button class="filter" onclick="setFilter('income',this)">Pemasukan</button>
+   <button class="filter" onclick="setFilter('expense',this)">Pengeluaran</button>
+   <button class="filter" onclick="setFilter('cash',this)">Cash</button>
+   <button class="filter" onclick="setFilter('nontunai',this)">Non-tunai</button>
+   <button class="filter" onclick="setFilter('transfer',this)">Transfer</button>
+   <button class="filter" onclick="setFilter('debt',this)">Utang</button>
+  </div>
+  <div id="allTransactions"></div>
+ </div>
+</section>
+
+<!-- STATISTIK -->
+<section id="statsPage" class="page">
+ <div class="card">
+  <h3>Perbandingan 6 Bulan</h3>
+  <canvas id="compareChart" class="chart-canvas" style="height:240px"></canvas>
+  <div class="compare-legend">
+   <div class="compare-legend-item">
+    <span class="compare-legend-dot" style="background:#a9d4b6"></span>Pemasukan
+   </div>
+   <div class="compare-legend-item">
+    <span class="compare-legend-dot" style="background:#d9aaaa"></span>Pengeluaran
+   </div>
+  </div>
+ </div>
+ <div class="card">
+  <h3>Detail Bulanan</h3>
+  <div id="monthlyDetail"></div>
+ </div>
+</section>
+
+<!-- UTANG & PIUTANG -->
+<section id="debtsPage" class="page">
+ <div class="debt-summary">
+  <div class="balance-mini">
+   <div class="balance-mini-label">💸 Total Utang</div>
+   <div class="balance-mini-value" style="color:#e8b88a" id="totalUtang">Rp 0</div>
+  </div>
+  <div class="balance-mini">
+   <div class="balance-mini-label">💰 Total Piutang</div>
+   <div class="balance-mini-value" style="color:#b8d48a" id="totalPiutang">Rp 0</div>
+  </div>
+ </div>
+
+ <div class="card">
+  <h3>Daftar</h3>
+  <div class="filters" style="margin-bottom:14px">
+   <button class="filter active" onclick="setDebtFilter('all',this)">Semua</button>
+   <button class="filter" onclick="setDebtFilter('utang',this)">Utang</button>
+   <button class="filter" onclick="setDebtFilter('piutang',this)">Piutang</button>
+   <button class="filter" onclick="setDebtFilter('belum',this)">Belum Lunas</button>
+   <button class="filter" onclick="setDebtFilter('lunas',this)">Lunas</button>
+  </div>
+  <div id="debtList"></div>
+ </div>
+</section>
+
+<!-- BERULANG -->
+<section id="recurringPage" class="page">
+ <div class="card">
+  <h3>Transaksi Berulang</h3>
+  <div class="hint-text" style="margin-bottom:13px">
+   Transaksi otomatis yang menunggu konfirmasi setiap jatuh tempo.
+  </div>
+  <button class="primary" onclick="openRecurring()">＋ Tambah Aturan</button>
+  <div id="recurringList"></div>
+ </div>
+</section>
+
+<!-- SETTINGS -->
+<section id="settingsPage" class="page">
+ <div class="card">
+  <h3>Pengaturan</h3>
+
+  <div class="setting">
+   <div>
+    <div class="setting-title">Logo aplikasi</div>
+    <div class="setting-desc">Ikon yang tampil di header</div>
+   </div>
+   <button class="small-btn" onclick="document.getElementById('logoFile').click()">Import</button>
+   <input id="logoFile" type="file" accept="image/*" style="display:none" onchange="importLogo(this)">
+  </div>
+
+  <div class="setting">
+   <div>
+    <div class="setting-title">Reset logo</div>
+    <div class="setting-desc">Kembali ke ikon default ₿</div>
+   </div>
+   <button class="small-btn danger" onclick="resetLogo()">Reset</button>
+  </div>
+
+  <div class="setting">
+   <div>
+    <div class="setting-title">Nama aplikasi</div>
+    <div class="setting-desc">Nama yang tampil di bagian atas</div>
+   </div>
+   <button class="small-btn" onclick="changeName()">Ubah</button>
+  </div>
+
+  <div class="setting">
+   <div>
+    <div class="setting-title">Saldo awal Cash</div>
+    <div class="setting-desc">Uang fisik di dompet</div>
+   </div>
+   <button class="small-btn" onclick="changeInitial('cash')">Ubah</button>
+  </div>
+
+  <div class="setting">
+   <div>
+    <div class="setting-title">Saldo awal Non-tunai</div>
+    <div class="setting-desc">Rekening, e-wallet, dll</div>
+   </div>
+   <button class="small-btn" onclick="changeInitial('nontunai')">Ubah</button>
+  </div>
+
+  <div class="setting">
+   <div>
+    <div class="setting-title">Batas minimal dana darurat</div>
+    <div class="setting-desc" id="minReserveDesc">Kalau 20% saldo di bawah angka ini, dana darurat tidak dikunci</div>
+   </div>
+   <button class="small-btn" onclick="changeMinReserve()">Ubah</button>
+  </div>
+
+  <div class="setting">
+   <div>
+    <div class="setting-title">Backup data</div>
+    <div class="setting-desc" id="lastBackupText">Belum pernah backup</div>
+   </div>
+   <button class="small-btn" onclick="openBackup()">Backup</button>
+  </div>
+
+  <div class="setting">
+   <div>
+    <div class="setting-title">Restore data</div>
+    <div class="setting-desc">Pulihkan dari file JSON</div>
+   </div>
+   <button class="small-btn" onclick="document.getElementById('restoreFile').click()">Restore</button>
+   <input id="restoreFile" type="file" accept=".json,application/json" style="display:none" onchange="restore(this)">
+  </div>
+
+  <div class="setting">
+   <div>
+    <div class="setting-title">Export CSV</div>
+    <div class="setting-desc">Buka di Excel atau Google Sheets</div>
+   </div>
+   <button class="small-btn" onclick="exportCSV()">Export</button>
+  </div>
+
+  <div class="setting">
+   <div>
+    <div class="setting-title danger">Hapus semua data</div>
+    <div class="setting-desc">Tidak dapat dibatalkan</div>
+   </div>
+   <button class="small-btn danger" onclick="resetData()">Hapus</button>
+  </div>
+ </div>
+</section>
+
+</div>
+
+<nav class="bottom-nav">
+ <button class="nav-btn active" onclick="showPage('home',this)">
+  <span class="nav-icon">⌂</span>Beranda
+ </button>
+ <button class="nav-btn" onclick="showPage('transactions',this)">
+  <span class="nav-icon">☷</span>Transaksi
+ </button>
+ <button class="nav-btn" onclick="showPage('stats',this)">
+  <span class="nav-icon">◫</span>Statistik
+ </button>
+ <button class="nav-btn" onclick="showPage('debts',this)">
+  <span class="nav-icon">⇄</span>Utang
+ </button>
+</nav>
+
+<!-- MODAL TRANSAKSI -->
+<div class="modal" id="transactionModal">
+ <div class="modal-box">
+  <div class="modal-head">
+   <h2 id="transactionTitle">Tambah Transaksi</h2>
+   <button class="close" onclick="closeTransaction()">×</button>
+  </div>
+
+  <div class="type-switch triple">
+   <button id="incomeType" class="type-btn" onclick="setTransactionType('income')">Pemasukan</button>
+   <button id="expenseType" class="type-btn" onclick="setTransactionType('expense')">Pengeluaran</button>
+   <button id="transferType" class="type-btn" onclick="setTransactionType('transfer')">⇄ Transfer</button>
+  </div>
+
+  <div id="subTypeGroup" class="type-switch">
+   <button id="subNormalBtn" class="type-btn" onclick="setSubType('normal')">Biasa</button>
+   <button id="subDebtBtn" class="type-btn" onclick="setSubType('debt')">Utang / Piutang</button>
+  </div>
+
+  <div id="debtInfoGroup" style="display:none">
+   <div class="hint-text" id="debtHint" style="margin-bottom:13px;padding:11px;background:#1f1a10;border-radius:10px;color:#e8d9a8;font-size:11px;line-height:1.5"></div>
+   <div class="input-group" id="debtPersonGroup">
+    <label id="debtPersonLabel">Nama orang</label>
+    <input id="debtPerson" class="input" type="text" placeholder="Contoh: Budi">
+   </div>
+   <div class="input-group">
+    <label>Jatuh tempo (opsional)</label>
+    <input id="debtDueDate" class="input" type="date">
+   </div>
+  </div>
+
+  <div id="walletGroup">
+   <div class="input-group" style="margin-bottom:7px">
+    <label>Dompet</label>
+   </div>
+   <div class="wallet-switch">
+    <button id="walletCashBtn" class="wallet-btn" onclick="setWallet('cash')">💵 Cash</button>
+    <button id="walletNontunaiBtn" class="wallet-btn" onclick="setWallet('nontunai')">🏦 Non-tunai</button>
+   </div>
+  </div>
+
+  <div id="transferGroup" style="display:none">
+   <div class="input-group">
+    <label>Dari dompet</label>
+    <select id="transferFrom" class="select">
+     <option value="cash">💵 Cash</option>
+     <option value="nontunai" selected>🏦 Non-tunai</option>
+    </select>
+   </div>
+   <div class="input-group">
+    <label>Ke dompet</label>
+    <select id="transferTo" class="select">
+     <option value="cash" selected>💵 Cash</option>
+     <option value="nontunai">🏦 Non-tunai</option>
+    </select>
+   </div>
+  </div>
+
+  <div class="input-group">
+   <label>Nominal</label>
+   <input id="amount" class="input" type="text" inputmode="numeric" placeholder="0" oninput="formatMoneyInput(this)">
+  </div>
+
+  <div class="input-group" id="categoryGroup">
+   <label>Kategori</label>
+   <select id="category" class="select" onchange="toggleDescription()">
+    <option value="">Pilih kategori</option>
+   </select>
+  </div>
+
+  <div class="input-group" id="descriptionGroup" style="display:none">
+   <label>Keterangan</label>
+   <input id="description" class="input" type="text" placeholder="Contoh: beli sepatu">
+  </div>
+
+  <div class="input-group">
+   <label>Tanggal transaksi</label>
+   <input id="date" class="input" type="date">
+  </div>
+
+  <button class="primary" onclick="saveTransaction()">Simpan Transaksi</button>
+  <button class="secondary danger" id="deleteTransactionBtn" style="display:none" onclick="deleteTransaction()">Hapus Transaksi</button>
+ </div>
+</div>
+
+<!-- MODAL DETAIL KATEGORI (untuk grafik) -->
+<div class="modal" id="categoryDetailModal">
+ <div class="modal-box">
+  <div class="modal-head">
+   <h2 id="categoryDetailTitle">Detail Kategori</h2>
+   <button class="close" onclick="closeCategoryDetail()">×</button>
+  </div>
+  <div id="categoryDetailBody"></div>
+ </div>
+</div>
+
+<!-- MODAL BAYAR UTANG -->
+<div class="modal" id="payDebtModal">
+ <div class="modal-box">
+  <div class="modal-head">
+   <h2 id="payDebtTitle">Bayar</h2>
+   <button class="close" onclick="closePayDebt()">×</button>
+  </div>
+  <div class="hint-text" id="payDebtInfo" style="margin-bottom:13px;font-size:11px;line-height:1.5"></div>
+  <div class="input-group">
+   <label>Nominal</label>
+   <input id="payDebtAmount" class="input" type="text" inputmode="numeric" placeholder="0" oninput="formatMoneyInput(this)">
+  </div>
+  <div class="input-group">
+   <label>Dompet</label>
+   <select id="payDebtWallet" class="select">
+    <option value="cash">💵 Cash</option>
+    <option value="nontunai" selected>🏦 Non-tunai</option>
+   </select>
+  </div>
+  <div class="input-group">
+   <label>Tanggal</label>
+   <input id="payDebtDate" class="input" type="date">
+  </div>
+  <button class="primary" onclick="saveDebtPayment()">Simpan Pembayaran</button>
+ </div>
+</div>
+
+<!-- MODAL BERULANG -->
+<div class="modal" id="recurringModal">
+ <div class="modal-box">
+  <div class="modal-head">
+   <h2 id="recurringTitle">Aturan Berulang</h2>
+   <button class="close" onclick="closeRecurring()">×</button>
+  </div>
+  <div class="type-switch">
+   <button id="recIncomeType" class="type-btn" onclick="setRecurringType('income')">Pemasukan</button>
+   <button id="recExpenseType" class="type-btn" onclick="setRecurringType('expense')">Pengeluaran</button>
+  </div>
+  <div class="input-group">
+   <label>Nama aturan</label>
+   <input id="recurringName" class="input" type="text" placeholder="Contoh: Gaji bulanan">
+  </div>
+  <div class="input-group">
+   <label>Nominal</label>
+   <input id="recurringAmount" class="input" type="text" inputmode="numeric" placeholder="0" oninput="formatMoneyInput(this)">
+  </div>
+  <div class="input-group">
+   <label>Kategori</label>
+   <select id="recurringCategory" class="select" onchange="toggleRecurringDescription()">
+    <option value="">Pilih kategori</option>
+   </select>
+  </div>
+  <div class="input-group" id="recurringDescriptionGroup" style="display:none">
+   <label>Keterangan</label>
+   <input id="recurringDescription" class="input" type="text" placeholder="Contoh: langganan">
+  </div>
+  <div class="input-group">
+   <label>Dompet</label>
+   <select id="recurringWallet" class="select">
+    <option value="cash">💵 Cash</option>
+    <option value="nontunai" selected>🏦 Non-tunai</option>
+   </select>
+  </div>
+  <div class="input-group">
+   <label>Tanggal jatuh tempo (1-31)</label>
+   <input id="recurringDay" class="input" type="number" min="1" max="31" placeholder="25">
+  </div>
+  <div class="input-group">
+   <label>Mulai dari bulan</label>
+   <input id="recurringStartMonth" class="input" type="month">
+  </div>
+  <button class="primary" onclick="saveRecurring()">Simpan Aturan</button>
+  <button class="secondary danger" id="deleteRecurringBtn" style="display:none" onclick="deleteRecurring()">Hapus Aturan</button>
+ </div>
+</div>
+
+<!-- MODAL PROMPT -->
+<div class="modal" id="promptModal">
+ <div class="modal-box">
+  <div class="modal-head">
+   <h2 id="promptTitle">Input</h2>
+   <button class="close" onclick="closePrompt()">×</button>
+  </div>
+  <div class="input-group">
+   <label id="promptLabel">Isi</label>
+   <input id="promptInput" class="input" type="text" placeholder="">
+  </div>
+  <button class="primary" onclick="submitPrompt()">Simpan</button>
+ </div>
+</div>
+
+<!-- MODAL BACKUP -->
+<div class="modal" id="backupModal">
+ <div class="modal-box">
+  <div class="modal-head">
+   <h2>Backup Data</h2>
+   <button class="close" onclick="closeBackup()">×</button>
+  </div>
+  <div class="hint-text" style="margin-bottom:14px;font-size:11px;line-height:1.5">
+   Pilih mau diapakan file backup-nya.
+  </div>
+  <button class="primary" onclick="shareBackup()">📤 Bagikan ke aplikasi</button>
+  <button class="secondary" onclick="downloadBackup()">💾 Simpan ke perangkat</button>
+ </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+
+</body>
+</html>
