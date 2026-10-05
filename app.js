@@ -1,6 +1,7 @@
 /* ============================================================
    DUITKU — Aplikasi Keuangan Pribadi (Final Version)
    ============================================================ */
+'use strict';
 
 /* ============ KONSTANTA ============ */
 const KEY="keuangan_gue_data_v4";
@@ -8,6 +9,10 @@ const DEFAULT_MIN_RESERVE=20000;
 const INCOME_CATEGORIES=["Gaji","Service Charge","Bonus","Usaha","Lainnya"];
 const EXPENSE_CATEGORIES=["Makanan","Transportasi","Tagihan","Belanja","Hiburan","Kesehatan","Keluarga","Lainnya"];
 const CHART_COLORS=["#a9d4b6","#9db8e0","#c0a8e0","#e8d9a8","#d9aaaa","#a8d4d0","#d4b8a8","#b8a8d4","#a8c4d4","#d4a8b8","#c4d4a8","#d4c4a8"];
+
+/* Tanggal tetap pemasukan rutin */
+const INCOME_DAY_1=15;  // gaji
+const INCOME_DAY_2=28;  // bonus
 
 /* ============ STATE ============ */
 let data=loadData();
@@ -152,7 +157,11 @@ function newId(){
 }
 
 function saveData(){
- localStorage.setItem(KEY,JSON.stringify(data));
+ try{
+  localStorage.setItem(KEY,JSON.stringify(data));
+ }catch(e){
+  showToast("Gagal menyimpan data. Storage penuh?");
+ }
 }
 
 /* ============ FORMAT ============ */
@@ -287,43 +296,67 @@ function onMonthChange(ym){
  renderStats();
 }
 
-/* ============ ANALISIS KEUANGAN ============ */
-function getIncomePattern(){
- const incomes=data.transactions.filter(t=>t.type==="income"&&t.date<=today());
- if(incomes.length<3) return{enough:false,text:"Perkiraan awal: sekitar tanggal 15 dan 28"};
- const freq={};
- incomes.forEach(t=>{const day=Number(t.date.slice(8,10));freq[day]=(freq[day]||0)+1;});
- const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,2).map(x=>Number(x[0])).sort((a,b)=>a-b);
- return{enough:true,days:sorted,text:sorted.map(d=>"sekitar tanggal "+d).join(" dan ")};
-}
-
-function getNextIncomeEstimate(){
- const pattern=getIncomePattern();
+/* ============ PERKIRAAN PEMASUKAN ============ */
+/* Logika: pemasukan rutin dikunci tanggal 15 & 28.
+   - Hari ini < 15   -> berikutnya 15 bulan ini
+   - Hari ini = 15   -> berikutnya 28 bulan ini
+   - 15 < hari < 28  -> berikutnya 28 bulan ini
+   - Hari ini >= 28  -> berikutnya 15 bulan depan
+*/
+function getNextIncomeDate(){
  const now=new Date();
- if(!pattern.enough) return "Masih perkiraan awal";
- let candidates=[];
- pattern.days.forEach(day=>{
-  let d=new Date(now.getFullYear(),now.getMonth(),day);
-  if(d<=now) d=new Date(now.getFullYear(),now.getMonth()+1,day);
-  candidates.push(d);
- });
- candidates.sort((a,b)=>a-b);
- if(!candidates.length) return "Belum dapat diperkirakan";
- return candidates[0].toLocaleDateString("id-ID",{day:"numeric",month:"long"});
+ const day=now.getDate();
+ const y=now.getFullYear();
+ const m=now.getMonth();
+
+ if(day<INCOME_DAY_1){
+  return new Date(y,m,INCOME_DAY_1);
+ }
+ if(day>=INCOME_DAY_1 && day<INCOME_DAY_2){
+  return new Date(y,m,INCOME_DAY_2);
+ }
+ /* day >= 28 -> tanggal 15 bulan depan */
+ return new Date(y,m+1,INCOME_DAY_1);
 }
 
+function getDaysUntilIncome(){
+ const now=new Date();
+ now.setHours(0,0,0,0);
+ const next=getNextIncomeDate();
+ next.setHours(0,0,0,0);
+ return Math.max(0,Math.round((next-now)/86400000));
+}
+
+function formatNextIncomeShort(){
+ const d=getNextIncomeDate();
+ return d.toLocaleDateString("id-ID",{day:"numeric",month:"short"});
+}
+
+function formatNextIncomeLabel(){
+ const days=getDaysUntilIncome();
+ const date=formatNextIncomeShort();
+ if(days===0) return date+" (hari ini)";
+ if(days===1) return date+" (besok)";
+ return date+" ("+days+" hari lagi)";
+}
+
+/* ============ ANALISIS KEUANGAN ============ */
 function financialAnalysis(){
  const bal=balances();
  const mt=monthTotals();
  const now=new Date();
  const isCurrent=selectedMonth===currentMonth();
 
- const daysInMonth=isCurrent
-  ? new Date(now.getFullYear(),now.getMonth()+1,0).getDate()
-  : new Date(Number(selectedMonth.slice(0,4)),Number(selectedMonth.slice(5,7)),0).getDate();
- const todayDate=now.getDate();
- const daysLeft=isCurrent?Math.max(1,daysInMonth-todayDate+1):daysInMonth;
- const elapsed=isCurrent?Math.max(1,todayDate):daysInMonth;
+ /* Sisa hari dihitung sampai pemasukan berikutnya, bukan akhir bulan */
+ const daysLeft=Math.max(1,getDaysUntilIncome()+1);
+
+ /* Untuk bulan yang dipilih bukan bulan berjalan, tetap pakai jumlah hari bulan tsb */
+ const daysInSelectedMonth=new Date(
+  Number(selectedMonth.slice(0,4)),
+  Number(selectedMonth.slice(5,7)),
+  0
+ ).getDate();
+ const elapsed=isCurrent?Math.max(1,now.getDate()):daysInSelectedMonth;
 
  const startOfMonthBalance=bal.total-mt.income+mt.expense;
 
@@ -344,7 +377,7 @@ function financialAnalysis(){
  }
 
  const spendable=Math.max(0,bal.total-reserve);
- const dailyLimit=daysLeft>0?spendable/daysLeft:spendable;
+ const dailyLimit=spendable/daysLeft;
 
  let expenseToday=0;
  if(isCurrent){
@@ -381,7 +414,7 @@ function financialAnalysis(){
  return{
   startOfMonthBalance,reserve,reserveNote,spendable,dailyLimit,daysLeft,avgDaily,
   status,advice,expenseToday,remainingToday,overLimit,usagePercent,isCurrent,minReserve,
-  nextIncome:getNextIncomeEstimate(),pattern:getIncomePattern()
+  nextIncome:formatNextIncomeLabel()
  };
 }
 
@@ -426,7 +459,7 @@ function renderDashboard(){
    </div>
    <div class="analysis-progress-meta">
     <span>${analysis.usagePercent.toFixed(0)}% dari batas harian</span>
-    <span>Sisa ${analysis.daysLeft} hari</span>
+    <span>${analysis.daysLeft} hari lagi ke pemasukan</span>
    </div>
   </div>
  ` : `
@@ -445,7 +478,6 @@ function renderDashboard(){
   ${todayRows}
   <div class="analysis-row"><span class="analysis-label">Rata-rata pengeluaran</span><span class="analysis-value">${rupiah(analysis.avgDaily)}/hari</span></div>
   <div class="analysis-row"><span class="analysis-label">Status</span><span class="analysis-value"><span class="status">${analysis.status}</span></span></div>
-  <div class="analysis-row"><span class="analysis-label">Pola pemasukan</span><span class="analysis-value">${analysis.pattern.text}</span></div>
   <div class="analysis-row"><span class="analysis-label">Perkiraan pemasukan berikutnya</span><span class="analysis-value">${analysis.nextIncome}</span></div>
   <div class="advice">${analysis.advice}</div>
  `;
@@ -1417,6 +1449,7 @@ function findSimilar(payload){
  const baseDate=payload.date;
  const candidates=data.transactions.filter(t=>{
   if(editingTransactionId!==null && t.id===editingTransactionId) return false;
+  if(t.paymentForDebtId) return false;
   if(t.type!==payload.type) return false;
   if(Number(t.amount)!==Number(payload.amount)) return false;
   if(t.category!==payload.category) return false;
@@ -1498,7 +1531,11 @@ function saveTransaction(){
      d.amount=payload.amount;
     }
    }else if(t.debtId && !payload.isDebt){
-    data.debts=data.debts.filter(x=>x.id!==t.debtId);
+    if(confirm("Catatan utang/piutang terkait akan dihapus. Lanjut?")){
+     data.debts=data.debts.filter(x=>x.id!==t.debtId);
+    }else{
+     return;
+    }
    }
    delete t.debtId;
    Object.assign(t,payload);
@@ -1634,7 +1671,7 @@ function renderTransactions(){
 
 function setFilter(filter,button){
  currentFilter=filter;
- document.querySelectorAll(".filters .filter").forEach(x=>x.classList.remove("active"));
+ document.querySelectorAll("#transactionsPage .filter").forEach(x=>x.classList.remove("active"));
  button.classList.add("active");
  renderTransactions();
 }
@@ -2399,13 +2436,23 @@ function restore(input){
   data=normalizeData(imported);
   selectedMonth=currentMonth();
   currentFilter="all";
+  currentDebtFilter="all";
   currentSearch="";
+  chartRange="month";
   hiddenCategories=new Set();
   selectedDonutSlice=null;
   selectedBars=[];
   const si=document.getElementById("searchInput");
   if(si) si.value="";
-  document.querySelectorAll(".filters .filter").forEach((x,i)=>{
+  document.querySelectorAll("#transactionsPage .filter").forEach((x,i)=>{
+   x.classList.remove("active");
+   if(i===0) x.classList.add("active");
+  });
+  document.querySelectorAll("#debtsPage .filter").forEach((x,i)=>{
+   x.classList.remove("active");
+   if(i===0) x.classList.add("active");
+  });
+  document.querySelectorAll(".range-btn").forEach((x,i)=>{
    x.classList.remove("active");
    if(i===0) x.classList.add("active");
   });
@@ -2455,13 +2502,23 @@ function resetData(){
  data={name:"Duitku",initialCash:0,initialNontunai:0,transactions:[],debts:[],recurring:[],nextId:1,logo:null,lastBackupDate:null,minReserve:DEFAULT_MIN_RESERVE};
  selectedMonth=currentMonth();
  currentFilter="all";
+ currentDebtFilter="all";
  currentSearch="";
+ chartRange="month";
  hiddenCategories=new Set();
  selectedDonutSlice=null;
  selectedBars=[];
  const si=document.getElementById("searchInput");
  if(si) si.value="";
- document.querySelectorAll(".filters .filter").forEach((x,i)=>{
+ document.querySelectorAll("#transactionsPage .filter").forEach((x,i)=>{
+  x.classList.remove("active");
+  if(i===0) x.classList.add("active");
+ });
+ document.querySelectorAll("#debtsPage .filter").forEach((x,i)=>{
+  x.classList.remove("active");
+  if(i===0) x.classList.add("active");
+ });
+ document.querySelectorAll(".range-btn").forEach((x,i)=>{
   x.classList.remove("active");
   if(i===0) x.classList.add("active");
  });
